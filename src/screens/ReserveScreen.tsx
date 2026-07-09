@@ -1,7 +1,7 @@
 /**
  * ReserveScreen.tsx — clean, simple design
  */
-
+declare const global: any;
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
@@ -14,6 +14,8 @@ interface Props {
   onClear    : () => void;
 }
 
+
+
 export default function ReserveScreen({ onNavigate, onClear }: Props) {
   const [stats,   setStats]   = useState<any>(null);
   const [entries, setEntries] = useState<any[]>([]);
@@ -21,12 +23,22 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
   useEffect(() => { loadData(); }, []);
 
   const loadData = () => {
-    setStats(ReserveStorage.getStats());
-    const raw  = (ReserveStorage as any).meta?.entries || {};
-    const list = Object.entries(raw).map(([url, data]: [string, any]) => ({ url, ...data }));
-    list.sort((a, b) => b.cachedAt - a.cachedAt);
+    const storage = ReserveStorage as any;
+    const s = storage.getStats();
+    setStats(s);
+    const raw = storage.meta?.entries || {};
+    const list = Object.entries(raw).map(([url, data]: [string, any]) => ({
+      url,
+      ...data,
+    }));
+    list.sort((a: any, b: any) => b.cachedAt - a.cachedAt);
     setEntries(list);
   };
+
+  useEffect(() => {
+    const timer = setInterval(loadData, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleClear = () => {
     Alert.alert('Clear reserve', 'Delete all saved offline content?', [
@@ -59,11 +71,16 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => onNavigate('home')}>
+        <TouchableOpacity onPress={() => nav('home')}>
           <Text style={styles.backBtn}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Saved content</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity onPress={async () => {
+          await ReserveStorage.clear();
+          loadData();
+        }}>
+          <Text style={{ color: '#5A2020', fontSize: 13 }}>Clear all</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Stats */}
@@ -123,6 +140,33 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
           )}
         />
       )}
+
+      {entries.map((item: any, i: number) => (
+        <View key={i} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#161616' }}>
+          <TouchableOpacity
+            onPress={() => {
+              (global as any).pendingUrl = item.url;
+              onNavigate('browser');
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: '#888', fontSize: 12, marginBottom: 2 }} numberOfLines={1}>
+              {item.url?.replace(/https?:\/\//, '') || 'Unknown'}
+            </Text>
+            <Text style={{ color: '#3A3A3A', fontSize: 10, marginBottom: 6 }}>
+              {formatSize(item.sizeBytes)} · {item.hitCount || 0} reads
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              await ReserveStorage.delete(item.url);
+              loadData();
+            }}
+          >
+            <Text style={{ color: '#442222', fontSize: 11 }}>remove</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
 
       {/* Clear link */}
       <View style={styles.clearWrap}>
