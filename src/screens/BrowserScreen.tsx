@@ -2,9 +2,8 @@
  * BrowserScreen.tsx
  * In-app browser that auto-saves pages to reserve as you browse.
  */
-declare const global: any; 
-
-import React, { useState, useRef , useEffect } from 'react';
+declare const global: any;
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   TextInput, Platform, ActivityIndicator,
@@ -24,15 +23,6 @@ export default function BrowserScreen({ onNavigate }: Props) {
   const [savedToast, setSavedToast] = useState(false);
   const [pageTitle, setPageTitle]   = useState('');
   const webViewRef = useRef<any>(null);
-
-  useEffect(() => {
-    if ((global as any).pendingUrl) {
-      const target = (global as any).pendingUrl;
-      (global as any).pendingUrl = null;
-      setUrl(target);
-      setInputUrl(target);
-    }
-  }, []);
 
   const go = (target?: string) => {
     let dest = target || inputUrl;
@@ -64,22 +54,14 @@ export default function BrowserScreen({ onNavigate }: Props) {
     try {
       const data = JSON.parse(e.nativeEvent.data);
       if (data.type === 'html' && data.html) {
-        // Limit to 5MB
-        if (data.html.length > 5 * 1024 * 1024) {
-          console.log('Page too large to cache');
-          return;
-        }
         const saved = await ReserveStorage.save(data.url, data.html, 'text/html');
-        console.log('Save result:', saved);
         if (saved) {
           setSavedToast(true);
           setTimeout(() => setSavedToast(false), 2000);
         }
       }
-    } catch (e) {
-      console.log('onMessage error:', e);
-    }
-};
+    } catch (_) {}
+  };
 
   return (
     <View style={s.root}>
