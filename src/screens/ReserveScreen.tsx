@@ -40,10 +40,17 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  const handleClear = () => {
-    Alert.alert('Clear reserve', 'Delete all saved offline content?', [
+  const handleClearAll = () => {
+    Alert.alert('Clear all', 'Delete all saved content?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear all', style: 'destructive', onPress: async () => { await onClear(); loadData(); } },
+      { text: 'Clear', style: 'destructive', onPress: async () => {
+        try {
+          await ReserveStorage.clear();
+          loadData();
+        } catch (e) {
+          console.log('Clear error:', e);
+        }
+      }},
     ]);
   };
 
@@ -71,7 +78,7 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => nav('home')}>
+        <TouchableOpacity onPress={() => onNavigate('home')}>
           <Text style={styles.backBtn}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Saved content</Text>
@@ -170,7 +177,7 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
 
       {/* Clear link */}
       <View style={styles.clearWrap}>
-        <TouchableOpacity onPress={handleClear}>
+        <TouchableOpacity onPress={handleClearAll}>
           <Text style={styles.clearLink}>Clear all saved content</Text>
         </TouchableOpacity>
       </View>
