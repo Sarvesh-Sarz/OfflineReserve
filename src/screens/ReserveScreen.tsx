@@ -148,40 +148,7 @@ export default function ReserveScreen({ onNavigate, onClear }: Props) {
         />
       )}
 
-      {entries.map((item: any, i: number) => (
-        <View key={i} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#161616' }}>
-          <TouchableOpacity
-            onPress={() => {
-              (global as any).pendingUrl = item.url;
-              onNavigate('browser');
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ color: '#888', fontSize: 12, marginBottom: 2 }} numberOfLines={1}>
-              {item.url?.replace(/https?:\/\//, '') || 'Unknown'}
-            </Text>
-            <Text style={{ color: '#3A3A3A', fontSize: 10, marginBottom: 6 }}>
-              {formatSize(item.sizeBytes)} · {item.hitCount || 0} reads
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={async () => {
-              await ReserveStorage.delete(item.url);
-              loadData();
-            }}
-          >
-            <Text style={{ color: '#442222', fontSize: 11 }}>remove</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-
-      {/* Clear link */}
-      <View style={styles.clearWrap}>
-        <TouchableOpacity onPress={handleClearAll}>
-          <Text style={styles.clearLink}>Clear all saved content</Text>
-        </TouchableOpacity>
-      </View>
-
+      
       {/* Bottom nav */}
       <View style={styles.bottomNav}>
         <NavItem label="Home"    onPress={() => onNavigate('home')} />
