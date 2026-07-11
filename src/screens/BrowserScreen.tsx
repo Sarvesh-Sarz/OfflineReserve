@@ -1,7 +1,3 @@
-/**
- * BrowserScreen.tsx
- * In-app browser that auto-saves pages to reserve as you browse.
- */
 declare const global: any;
 import React, { useState, useRef, useEffect } from 'react';
 import {
