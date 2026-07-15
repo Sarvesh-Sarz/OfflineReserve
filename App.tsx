@@ -40,6 +40,7 @@ export default function App() {
       await PredictionEngine.start(
         ({ urgency, threat, etaMinutes }: any) => {
           console.log('Cache start', urgency, etaMinutes);
+          AutoSaver.saveKit(etaMinutes);
         },
         (payload: any) => {
           setThreat(payload.threat);
