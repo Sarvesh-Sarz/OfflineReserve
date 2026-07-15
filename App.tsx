@@ -10,6 +10,8 @@ import ReserveStorage from './src/storage/ReserveStorage';
 import ReserveScreen from './src/screens/ReserveScreen';
 import PredictionEngine from './src/prediction/PredictionEngine';
 import BrowserScreen from './src/screens/BrowserScreen';
+import AutoSaver from './src/engine/AutoSaver';
+import NotificationManager from './src/notification/NotificationManager';
 
 type Screen = 'home' | 'reserve' | 'settings' | 'browser';
 
