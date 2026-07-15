@@ -29,6 +29,8 @@ export default function App() {
   const bootEngines = async () => {
     try {
       await ReserveStorage.init();
+      await NotificationManager.init();
+      AutoSaver.onSaveProgress(progress => setProgress(progress));
 
       SignalMonitor.start();
       SignalMonitor.onChange((newState: string) => {
