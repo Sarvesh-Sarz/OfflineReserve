@@ -245,7 +245,7 @@ const s = StyleSheet.create({
   progBar      : { height: 2, backgroundColor: '#1A1A1A', borderRadius: 1, overflow: 'hidden', marginBottom: 8 },
   progFill     : { height: 2, backgroundColor: '#fff', borderRadius: 1 },
   progCount    : { fontSize: 11, color: '#444' },
-  navLink      : { fontSize: 13, color: '#555', marginBottom: 4 },
+  navLink: { fontSize: 13, color: '#555', marginBottom: 4, paddingVertical: 8 },
   sectionLabel : { fontSize: 11, color: '#444', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   sectionSub   : { fontSize: 12, color: '#444', lineHeight: 18, marginBottom: 14 },
   triggerList  : { gap: 6 },
