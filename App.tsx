@@ -105,7 +105,7 @@ function HomeScreen({ nav, state, threat, progress }: any) {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.topbar}>
           <Text style={s.appName}>OfflineReserve</Text>
-          <TouchableOpacity onPress={() => nav('settings')}>
+          <TouchableOpacity onPress={() => nav('settings')} activeOpacity={0.7}>
             <Text style={s.topbarRight}>Settings</Text>
           </TouchableOpacity>
         </View>
