@@ -41,6 +41,8 @@ class ReserveStorage {
         this.meta = JSON.parse(raw);
         console.log(`[ReserveStorage] Loaded ${Object.keys(this.meta.entries).length} cached entries`);
       }
+      console.log('[ReserveStorage] Entries:', Object.keys(this.meta.entries || {}).length);
+      console.log('[ReserveStorage] Meta:', JSON.stringify(this.meta).substring(0, 200));
 
       this.ready = true;
     } catch (e) {
@@ -55,10 +57,12 @@ class ReserveStorage {
   async save(url, content, contentType = 'text/html') {
     if (!this.ready) return false;
 
+    url = url.split('#')[0].split('?')[0].replace(/\/$/, '').trim();
+
     try {
       const filename = this._urlToFilename(url);
       const filepath = `${RESERVE_DIR}/${filename}`;
-      const contentBytes = Buffer.byteLength(content, 'utf8');
+      const contentBytes = content.length * 2;
       const contentMB = contentBytes / (1024 * 1024);
       const reserveBytes = this.meta.totalSizeMB * 1024 * 1024;
 
@@ -101,8 +105,10 @@ class ReserveStorage {
    * Returns content string or null if not cached.
    */
   async get(url) {
+    console.log('[ReserveStorage] Looking for:', url);
+    console.log('[ReserveStorage] Have keys:', Object.keys(this.meta.entries).join(', '));
     if (!this.ready) return null;
-
+    url = url.split('#')[0].split('?')[0].replace(/\/$/, '').trim();
     const entry = this.meta.entries[url];
     if (!entry) return null;
 
