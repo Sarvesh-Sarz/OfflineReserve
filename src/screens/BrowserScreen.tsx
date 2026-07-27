@@ -13,8 +13,8 @@ interface Props {
 }
 
 export default function BrowserScreen({ onNavigate }: Props) {
-  const [liveUrl, setLiveUrl]       = useState('https://www.google.com');
-  const [inputUrl, setInputUrl]     = useState('https://www.google.com');
+  const [liveUrl, setLiveUrl] = useState('');
+  const [inputUrl, setInputUrl] = useState('');
   const [loading, setLoading]       = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [cachedHtml, setCachedHtml] = useState<string | null>(null);
@@ -59,11 +59,20 @@ export default function BrowserScreen({ onNavigate }: Props) {
     setLiveUrl(dest);
   };
 
+  const SKIP_URLS = [
+  'google.com',
+  'chrome-error://',
+  'about:blank',
+  'chrome://',
+  ];
+
   const onLoadEnd = async (e: any) => {
     setLoading(false);
     const currentUrl = e.nativeEvent.url;
     setInputUrl(currentUrl);
     if (isOffline) return;
+    const shouldSkip = SKIP_URLS.some(skip => currentUrl.includes(skip));
+    if (shouldSkip) return;
     if (!PrivacyFilter.isAllowed(currentUrl)) return;
     webViewRef.current?.injectJavaScript(`
       window.ReactNativeWebView.postMessage(
@@ -150,7 +159,7 @@ export default function BrowserScreen({ onNavigate }: Props) {
       ) : (
         <WebView
           ref={webViewRef}
-          source={{ uri: liveUrl }}
+          source={liveUrl ? { uri: liveUrl } : { html: '<html><body style="background:#0D0D0D"></body></html>' }}
           style={s.webview}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={onLoadEnd}
