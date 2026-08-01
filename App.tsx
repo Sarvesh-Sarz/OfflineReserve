@@ -20,7 +20,7 @@ export default function App() {
   const [sigState, setSigState]   = useState('clear');
   const [threat, setThreat]       = useState<any>(null);
   const [progress, setProgress]   = useState<any>(null);
-  const [ready, setReady]         = useState(false);
+  const [ready, setReady]         = useState(true);
 
   useEffect(() => {
     bootEngines();
@@ -31,7 +31,6 @@ export default function App() {
       await ReserveStorage.init();
       await NotificationManager.init();
       AutoSaver.onSaveProgress(progress => setProgress(progress));
-
       SignalMonitor.start();
       SignalMonitor.onChange((newState: string) => {
         setSigState(newState);
@@ -75,7 +74,30 @@ export default function App() {
   return (
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
-      {screen === 'home' && <HomeScreen nav={nav} state={sigState} threat={threat} progress={progress} />}
+      {screen === 'home' && (
+        <HomeScreen 
+          nav={nav} 
+          state={sigState} 
+          threat={threat} 
+          progress={progress}
+          onTrigger={async (mode: string, mins: number) => {
+            PredictionEngine.manualTrigger(mode, mins);
+            
+            // Fire actual phone notification
+            await NotificationManager.notify({
+              state: mins <= 3 ? 'warning' : 'early',
+              title: mins <= 3 ? `Almost offline — ${mins} min left` : `Signal dropping in ~${mins} min`,
+              body: `Preparing your offline kit now...`,
+              threat: { zone: { name: mode }, etaMinutes: mins },
+            });
+
+            // Auto save content
+            setProgress({ saved: 0, total: 2, currentItem: 'Starting...', percent: 0 });
+            await AutoSaver.saveKit(mins, (p: any) => setProgress(p));
+            setTimeout(() => setProgress(null), 3000);
+          }}
+        />
+      )}
       {screen === 'reserve' && (
         <ReserveScreen
           onNavigate={nav}
@@ -206,11 +228,12 @@ function SettingsScreen({ nav }: any) {
   );
 }
 
+
 function BottomNav({ screen, nav }: any) {
   return (
     <View style={s.bottomNav}>
       {['home', 'reserve', 'settings'].map(item => (
-        <TouchableOpacity key={item} style={s.navItem} onPress={() => nav(item)}>
+        <TouchableOpacity key={item} style={s.navItem} onPress={() => nav(item)} activeOpacity={0.7} >
           <View style={[s.navDot, screen === item && s.navDotOn]} />
           <Text style={[s.navLbl, screen === item && s.navLblOn]}>
             {item.charAt(0).toUpperCase() + item.slice(1)}
