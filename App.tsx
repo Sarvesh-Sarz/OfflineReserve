@@ -112,7 +112,7 @@ export default function App() {
   );
 }
 
-function HomeScreen({ nav, state, threat, progress }: any) {
+function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
   const cfg: any = {
     clear:   { text: "You're online",               sub: 'Reserve filling in background' },
     early:   { text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`, sub: `Approaching ${threat?.zone?.name || 'a dead zone'}` },
@@ -178,7 +178,7 @@ function HomeScreen({ nav, state, threat, progress }: any) {
             { label: 'Going underground',    mode: 'basement', mins: 3  },
           ].map((t, i) => (
             <TouchableOpacity key={i} style={s.triggerRow}
-              onPress={() => PredictionEngine.manualTrigger(t.mode, t.mins)}>
+              onPress={() => onTrigger(t.mode, t.mins)}>
               <Text style={s.triggerName}>{t.label}</Text>
               <Text style={s.triggerMins}>{t.mins} min</Text>
             </TouchableOpacity>
