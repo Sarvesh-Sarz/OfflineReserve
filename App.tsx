@@ -82,19 +82,40 @@ export default function App() {
           progress={progress}
           onTrigger={async (mode: string, mins: number) => {
             PredictionEngine.manualTrigger(mode, mins);
-            
-            // Fire actual phone notification
+
+            const modeNames: any = {
+              flight: 'Boarding a flight', metro: 'Taking the metro',
+              highway: 'Long highway stretch', basement: 'Going underground',
+            };
+            const name = modeNames[mode];
+
+            // First notification — immediate
             await NotificationManager.notify({
-              state: mins <= 3 ? 'warning' : 'early',
-              title: mins <= 3 ? `Almost offline — ${mins} min left` : `Signal dropping in ~${mins} min`,
-              body: `Preparing your offline kit now...`,
-              threat: { zone: { name: mode }, etaMinutes: mins },
+              state: 'early',
+              title: `${name} — ${mins} min left`,
+              body: 'Browse & save content before you go offline.',
+              threat: null,
             });
 
-            // Auto save content
-            setProgress({ saved: 0, total: 2, currentItem: 'Starting...', percent: 0 });
-            await AutoSaver.saveKit(mins, (p: any) => setProgress(p));
-            setTimeout(() => setProgress(null), 3000);
+            // Second notification — 1 min before
+            setTimeout(async () => {
+              await NotificationManager.notify({
+                state: 'warning',
+                title: '1 min left',
+                body: 'Open app and save what you need now.',
+                threat: null,
+              });
+            }, (mins - 1) * 60 * 1000);
+
+            // Third notification — when offline
+            setTimeout(async () => {
+              await NotificationManager.notify({
+                state: 'offline',
+                title: "You're offline",
+                body: 'Open reserve to browse saved content.',
+                threat: null,
+              });
+            }, mins * 60 * 1000);
           }}
         />
       )}
@@ -116,7 +137,14 @@ function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
   const cfg: any = {
     clear:   { text: "You're online",               sub: 'Reserve filling in background' },
     early:   { text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`, sub: `Approaching ${threat?.zone?.name || 'a dead zone'}` },
-    warning: { text: `Almost offline — ${Math.round(threat?.etaMinutes || 3)} min left`, sub: 'Saving aggressively now' },
+    warning: { 
+      text: `Almost offline — ${Math.round(threat?.etaMinutes || 3)} min left`, 
+      sub: 'Open browser to save what you need' 
+    },
+    early: {
+      text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`,
+      sub: 'Open browser to save content before going offline'
+    },
     critical:{ text: 'Losing signal now',            sub: 'Last save in progress' },
     offline: { text: "You're offline",              sub: 'Serving from your reserve' },
   };
