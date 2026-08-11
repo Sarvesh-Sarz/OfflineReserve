@@ -174,11 +174,4 @@ This prototype demonstrates the concept and prediction engine. The full product 
 
 ---
 
-## Contact
 
-Built by a developer in Tamil Nadu, India.  
-Targeting the Jio GenNext Hub and Airtel Startup Program.
-
----
-
-*OfflineReserve v0.1.0 — Built with React Native*
