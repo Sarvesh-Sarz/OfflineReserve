@@ -94,8 +94,6 @@ class PredictionEngine {
    * e.g. "I'm boarding a flight"
    */
   manualTrigger(mode, minutesUntilOffline) {
-    console.log(`[PredictionEngine] Manual trigger: ${mode} in ${minutesUntilOffline} mins`);
-
     const fakeThreat = {
       zone: { name: this._manualModeName(mode), type: mode },
       etaMinutes: minutesUntilOffline,
@@ -104,9 +102,11 @@ class PredictionEngine {
       confidence: 'high',
       isManual: true,
     };
-
     this.currentThreat = fakeThreat;
-    this._handleThreat(fakeThreat);
+    // Just update UI state, don't fire notification
+    this._setState(minutesUntilOffline <= 1 ? STATES.CRITICAL : 
+                  minutesUntilOffline <= 3 ? STATES.WARNING : STATES.EARLY);
+    this._notifyListeners(this.state, STATES.CLEAR);
   }
 
   /**
