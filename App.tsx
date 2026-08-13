@@ -84,30 +84,36 @@ export default function App() {
             PredictionEngine.manualTrigger(mode, mins);
 
             const modeNames: any = {
-              flight: 'Boarding a flight', metro: 'Taking the metro',
-              highway: 'Long highway stretch', basement: 'Going underground',
+              flight: 'Boarding a flight', 
+              metro: 'Taking the metro',
+              highway: 'Long highway stretch', 
+              basement: 'Going underground',
             };
             const name = modeNames[mode];
+            const totalMs = mins * 60 * 1000;
+            const warningMs = (mins - 1) * 60 * 1000;
 
-            // First notification — immediate
+            // Immediate notification
             await NotificationManager.notify({
               state: 'early',
               title: `${name} — ${mins} min left`,
-              body: 'Browse & save content before you go offline.',
+              body: 'Open browser to save content before going offline.',
               threat: null,
             });
 
-            // Second notification — 1 min before
-            setTimeout(async () => {
-              await NotificationManager.notify({
-                state: 'warning',
-                title: '1 min left',
-                body: 'Open app and save what you need now.',
-                threat: null,
-              });
-            }, (mins - 1) * 60 * 1000);
+            // 1 min warning
+            if (mins > 1) {
+              setTimeout(async () => {
+                await NotificationManager.notify({
+                  state: 'warning',
+                  title: '1 min left',
+                  body: 'Last chance — save what you need now.',
+                  threat: null,
+                });
+              }, warningMs);
+            }
 
-            // Third notification — when offline
+            // Offline notification + reset UI
             setTimeout(async () => {
               await NotificationManager.notify({
                 state: 'offline',
@@ -115,7 +121,10 @@ export default function App() {
                 body: 'Open reserve to browse saved content.',
                 threat: null,
               });
-            }, mins * 60 * 1000);
+              // Reset UI back to clear
+              setSigState('clear');
+              setThreat(null);
+            }, totalMs);
           }}
         />
       )}
