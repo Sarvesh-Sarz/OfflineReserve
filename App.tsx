@@ -46,6 +46,12 @@ export default function App() {
           setSigState(payload.state);
         }
       );
+      // Reset if trigger already expired
+      if ((global as any).triggerExpiresAt && Date.now() > (global as any).triggerExpiresAt) {
+        setSigState('clear');
+        setThreat(null);
+        (global as any).triggerExpiresAt = null;
+      }
 
       PredictionEngine.onChange(({ newState, threat }: any) => {
         setSigState(newState);
@@ -81,17 +87,20 @@ export default function App() {
           threat={threat} 
           progress={progress}
           onTrigger={async (mode: string, mins: number) => {
-            PredictionEngine.manualTrigger(mode, mins);
-
             const modeNames: any = {
-              flight: 'Boarding a flight', 
-              metro: 'Taking the metro',
-              highway: 'Long highway stretch', 
+              flight: 'Boarding a flight',
+              metro: 'Taking the metro', 
+              highway: 'Long highway stretch',
               basement: 'Going underground',
             };
             const name = modeNames[mode];
-            const totalMs = mins * 60 * 1000;
-            const warningMs = (mins - 1) * 60 * 1000;
+
+            // Update UI
+            PredictionEngine.manualTrigger(mode, mins);
+
+            // Store when this trigger expires
+            const expiresAt = Date.now() + (mins * 60 * 1000);
+            (global as any).triggerExpiresAt = expiresAt;
 
             // Immediate notification
             await NotificationManager.notify({
@@ -101,30 +110,32 @@ export default function App() {
               threat: null,
             });
 
-            // 1 min warning
-            if (mins > 1) {
-              setTimeout(async () => {
+            // Check every 30 seconds
+            const interval = setInterval(async () => {
+              const remaining = Math.round(((global as any).triggerExpiresAt - Date.now()) / 60000);
+              
+              if (remaining <= 1 && remaining > 0) {
                 await NotificationManager.notify({
                   state: 'warning',
                   title: '1 min left',
-                  body: 'Last chance — save what you need now.',
+                  body: 'Last chance — open browser and save content now.',
                   threat: null,
                 });
-              }, warningMs);
-            }
+              }
 
-            // Offline notification + reset UI
-            setTimeout(async () => {
-              await NotificationManager.notify({
-                state: 'offline',
-                title: "You're offline",
-                body: 'Open reserve to browse saved content.',
-                threat: null,
-              });
-              // Reset UI back to clear
-              setSigState('clear');
-              setThreat(null);
-            }, totalMs);
+              if (remaining <= 0) {
+                clearInterval(interval);
+                // Reset UI
+                setSigState('clear');
+                setThreat(null);
+                await NotificationManager.notify({
+                  state: 'offline',
+                  title: "You're offline",
+                  body: 'Open reserve to browse saved content.',
+                  threat: null,
+                });
+              }
+            }, 30000);
           }}
         />
       )}
