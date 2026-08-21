@@ -89,20 +89,18 @@ export default function App() {
           onTrigger={async (mode: string, mins: number) => {
             const modeNames: any = {
               flight: 'Boarding a flight',
-              metro: 'Taking the metro', 
+              metro: 'Taking the metro',
               highway: 'Long highway stretch',
               basement: 'Going underground',
             };
             const name = modeNames[mode];
 
-            // Update UI
             PredictionEngine.manualTrigger(mode, mins);
 
-            // Store when this trigger expires
-            const expiresAt = Date.now() + (mins * 60 * 1000);
-            (global as any).triggerExpiresAt = expiresAt;
+            // Schedule all notifications upfront using Notifee triggers
+            const now = Date.now();
 
-            // Immediate notification
+            // Immediate
             await NotificationManager.notify({
               state: 'early',
               title: `${name} — ${mins} min left`,
@@ -110,32 +108,27 @@ export default function App() {
               threat: null,
             });
 
-            // Check every 30 seconds
-            const interval = setInterval(async () => {
-              const remaining = Math.round(((global as any).triggerExpiresAt - Date.now()) / 60000);
-              
-              if (remaining <= 1 && remaining > 0) {
-                await NotificationManager.notify({
-                  state: 'warning',
-                  title: '1 min left',
-                  body: 'Last chance — open browser and save content now.',
-                  threat: null,
-                });
-              }
+            // 1 min warning — scheduled
+            if (mins > 1) {
+              await NotificationManager.scheduleNotification(
+                '1 min left',
+                'Last chance — open browser and save content now.',
+                now + ((mins - 1) * 60 * 1000)
+              );
+            }
 
-              if (remaining <= 0) {
-                clearInterval(interval);
-                // Reset UI
-                setSigState('clear');
-                setThreat(null);
-                await NotificationManager.notify({
-                  state: 'offline',
-                  title: "You're offline",
-                  body: 'Open reserve to browse saved content.',
-                  threat: null,
-                });
-              }
-            }, 30000);
+            // Offline notification — scheduled
+            await NotificationManager.scheduleNotification(
+              "You're offline",
+              'Open reserve to browse saved content.',
+              now + (mins * 60 * 1000)
+            );
+
+            // Reset UI after countdown
+            setTimeout(() => {
+              setSigState('clear');
+              setThreat(null);
+            }, mins * 60 * 1000);
           }}
         />
       )}
