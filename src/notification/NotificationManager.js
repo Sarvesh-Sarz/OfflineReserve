@@ -3,8 +3,7 @@
  * Fires real phone notifications when dead zone detected.
  */
 
-import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
-
+import notifee, { AndroidImportance, AndroidVisibility, TriggerType } from '@notifee/react-native';
 class NotificationManager {
   constructor() {
     this.initialised = false;
@@ -67,6 +66,31 @@ class NotificationManager {
         },
       });
     } catch (e) {}
+  }
+
+  async scheduleNotification(title, body, timestamp) {
+    if (!this.initialised) return;
+    try {
+      await notifee.createTriggerNotification(
+        {
+          title,
+          body,
+          android: {
+            channelId   : this.channelId,
+            importance  : AndroidImportance.HIGH,
+            pressAction : { id: 'default' },
+            smallIcon   : 'ic_launcher',
+          },
+        },
+        {
+          type      : TriggerType.TIMESTAMP,
+          timestamp : timestamp,
+        }
+      );
+      console.log(`[NotificationManager] Scheduled: ${title} at ${new Date(timestamp).toLocaleTimeString()}`);
+    } catch (e) {
+      console.log('[NotificationManager] Schedule error:', e);
+    }
   }
 
   cancelAll() {
