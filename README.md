@@ -1,6 +1,6 @@
 # OfflineReserve
 
-> An Android app that predicts when you'll lose mobile signal — and prepares your phone before it happens.
+> An app that predicts when you'll lose mobile signal — and prepares your phone before it happens.
 
 Built for India's 450 million mobile users who lose connectivity daily on trains, metros and highways.
 
