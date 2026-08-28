@@ -174,9 +174,9 @@ export default function BrowserScreen({ onNavigate }: Props) {
       <View style={s.quickLinks}>
         <Text style={s.quickLabel}>Quick:</Text>
         {[
-          { label: 'Wikipedia', url: 'https://en.wikipedia.org' },
-          { label: 'News',      url: 'https://news.google.com'  },
-          { label: 'Maps',      url: 'https://maps.google.com'  },
+          { label: 'Wikipedia', url: 'https://en.m.wikipedia.org' },
+          { label: 'BBC News',  url: 'https://www.bbc.com/news'   },
+          { label: 'Weather',   url: 'https://wttr.in'             },
         ].map((item, i) => (
           <TouchableOpacity key={i} onPress={() => handleGo(item.url)} style={s.quickBtn}>
             <Text style={s.quickBtnText}>{item.label}</Text>
