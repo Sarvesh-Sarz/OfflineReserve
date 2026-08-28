@@ -117,13 +117,6 @@ export default function App() {
               );
             }
 
-            // Offline notification — scheduled
-            await NotificationManager.scheduleNotification(
-              "You're offline",
-              'Open reserve to browse saved content.',
-              now + (mins * 60 * 1000)
-            );
-
             // Reset UI after countdown
             setTimeout(() => {
               setSigState('clear');
