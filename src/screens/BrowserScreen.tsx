@@ -13,8 +13,8 @@ interface Props {
 }
 
 export default function BrowserScreen({ onNavigate }: Props) {
-  const [liveUrl, setLiveUrl] = useState('https://www.google.com');
-  const [inputUrl, setInputUrl] = useState('https://www.google.com');
+  const [liveUrl, setLiveUrl] = useState('');
+  const [inputUrl, setInputUrl] = useState('');
   const [loading, setLoading]       = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [cachedHtml, setCachedHtml] = useState<string | null>(null);
