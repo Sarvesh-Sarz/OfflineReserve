@@ -10,6 +10,7 @@ import ReserveStorage from './src/storage/ReserveStorage';
 import ReserveScreen from './src/screens/ReserveScreen';
 import PredictionEngine from './src/prediction/PredictionEngine';
 import BrowserScreen from './src/screens/BrowserScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AutoSaver from './src/engine/AutoSaver';
 import NotificationManager from './src/notification/NotificationManager';
 
