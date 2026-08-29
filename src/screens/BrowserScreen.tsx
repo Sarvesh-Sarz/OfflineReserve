@@ -149,7 +149,12 @@ export default function BrowserScreen({ onNavigate }: Props) {
         </View>
       )}
 
-      {cachedHtml ? (
+      {!liveUrl && !cachedHtml ? (
+        <View style={{ flex: 1, backgroundColor: '#0D0D0D', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#333', fontSize: 13 }}>Type a URL above to browse</Text>
+          <Text style={{ color: '#222', fontSize: 11, marginTop: 8 }}>Pages save automatically as you browse</Text>
+        </View>
+      ) : cachedHtml ? (
         <WebView
           source={{ html: cachedHtml, baseUrl: inputUrl }}
           style={s.webview}
@@ -159,7 +164,7 @@ export default function BrowserScreen({ onNavigate }: Props) {
       ) : (
         <WebView
           ref={webViewRef}
-          source={liveUrl ? { uri: liveUrl } : { html: '<html><body style="background:#0D0D0D"></body></html>' }}
+          source={{ uri: liveUrl }}
           style={s.webview}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={onLoadEnd}
