@@ -2,7 +2,7 @@ declare const global: any;
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Platform, StatusBar,
+  ScrollView, Platform, StatusBar, Alert,
 } from 'react-native';
 
 import SignalMonitor from './src/engine/SignalMonitor';
@@ -17,52 +17,44 @@ import NotificationManager from './src/notification/NotificationManager';
 type Screen = 'home' | 'reserve' | 'settings' | 'browser';
 
 export default function App() {
-  const [screen, setScreen]       = useState<Screen>('home');
-  const [sigState, setSigState]   = useState('clear');
-  const [threat, setThreat]       = useState<any>(null);
-  const [progress, setProgress]   = useState<any>(null);
-  const [ready, setReady]         = useState(true);
+  const [screen, setScreen]   = useState<Screen>('home');
+  const [sigState, setSigState] = useState('clear');
+  const [threat, setThreat]   = useState<any>(null);
+  const [progress, setProgress] = useState<any>(null);
+  const [ready, setReady]     = useState(true);
 
-  useEffect(() => {
-    bootEngines();
-  }, []);
+  useEffect(() => { bootEngines(); }, []);
 
   const bootEngines = async () => {
     try {
       await ReserveStorage.init();
       await NotificationManager.init();
-      AutoSaver.onSaveProgress(progress => setProgress(progress));
+      AutoSaver.onSaveProgress((p: any) => setProgress(p));
       SignalMonitor.start();
-      SignalMonitor.onChange((newState: string) => {
-        setSigState(newState);
-      });
+      SignalMonitor.onChange((newState: string) => setSigState(newState));
 
       await PredictionEngine.start(
-        ({ urgency, threat, etaMinutes }: any) => {
-          console.log('Cache start', urgency, etaMinutes);
-          AutoSaver.saveKit(etaMinutes);
-        },
-        (payload: any) => {
-          setThreat(payload.threat);
-          setSigState(payload.state);
-        }
+        ({ etaMinutes }: any) => { AutoSaver.saveKit(etaMinutes); },
+        (payload: any) => { setThreat(payload.threat); setSigState(payload.state); }
       );
-      // Reset if trigger already expired
-      if ((global as any).triggerExpiresAt && Date.now() > (global as any).triggerExpiresAt) {
-        setSigState('clear');
-        setThreat(null);
-        (global as any).triggerExpiresAt = null;
-      }
 
       PredictionEngine.onChange(({ newState, threat }: any) => {
         setSigState(newState);
         setThreat(threat);
       });
 
+      // Reset UI if trigger already expired
+      const expiresRaw = await AsyncStorage.getItem('@trigger_expires');
+      if (expiresRaw && Date.now() > parseInt(expiresRaw)) {
+        setSigState('clear');
+        setThreat(null);
+        await AsyncStorage.removeItem('@trigger_expires');
+      }
+
       setReady(true);
     } catch (e) {
       console.log('Boot error:', e);
-      setReady(true); // show UI anyway
+      setReady(true);
     }
   };
 
@@ -82,30 +74,37 @@ export default function App() {
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
       {screen === 'home' && (
-        <HomeScreen 
-          nav={nav} 
-          state={sigState} 
-          threat={threat} 
+        <HomeScreen
+          nav={nav}
+          state={sigState}
+          threat={threat}
           progress={progress}
           onTrigger={async (mode: string, mins: number) => {
+            // Block if already offline
+            if (sigState === 'offline') {
+              Alert.alert("You're offline", "Open the reserve to browse saved content.");
+              return;
+            }
+
             const modeNames: any = {
-              flight: 'Boarding a flight',
-              metro: 'Taking the metro',
-              highway: 'Long highway stretch',
+              flight:   'Boarding a flight',
+              metro:    'Taking the metro',
+              highway:  'Long highway stretch',
               basement: 'Going underground',
             };
             const name = modeNames[mode];
+            const now  = Date.now();
 
             PredictionEngine.manualTrigger(mode, mins);
 
-            // Schedule all notifications upfront using Notifee triggers
-            const now = Date.now();
+            // Store expiry in AsyncStorage so it survives app restart
+            await AsyncStorage.setItem('@trigger_expires', String(now + (mins * 60 * 1000)));
 
-            // Immediate
+            // Immediate notification
             await NotificationManager.notify({
-              state: 'early',
-              title: `${name} — ${mins} min left`,
-              body: 'Open browser to save content before going offline.',
+              state : 'early',
+              title : `${name} — ${mins} min left`,
+              body  : 'Open browser to save content before going offline.',
               threat: null,
             });
 
@@ -119,9 +118,10 @@ export default function App() {
             }
 
             // Reset UI after countdown
-            setTimeout(() => {
+            setTimeout(async () => {
               setSigState('clear');
               setThreat(null);
+              await AsyncStorage.removeItem('@trigger_expires');
             }, mins * 60 * 1000);
           }}
         />
@@ -129,31 +129,37 @@ export default function App() {
       {screen === 'reserve' && (
         <ReserveScreen
           onNavigate={nav}
-          onClear={async () => {
-            await ReserveStorage.clear();
-          }}
+          onClear={async () => { await ReserveStorage.clear(); }}
         />
       )}
       {screen === 'settings' && <SettingsScreen nav={nav} />}
-      {screen === 'browser' && <BrowserScreen onNavigate={nav} />}
+      {screen === 'browser'  && <BrowserScreen onNavigate={nav} />}
+    </View>
+  );
+}
+
+function BottomNav({ screen, nav }: any) {
+  return (
+    <View style={s.bottomNav}>
+      {['home', 'reserve', 'settings'].map(item => (
+        <TouchableOpacity key={item} style={s.navItem} onPress={() => nav(item)} activeOpacity={0.7}>
+          <View style={[s.navDot, screen === item && s.navDotOn]} />
+          <Text style={[s.navLbl, screen === item && s.navLblOn]}>
+            {item.charAt(0).toUpperCase() + item.slice(1)}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
 
 function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
   const cfg: any = {
-    clear:   { text: "You're online",               sub: 'Reserve filling in background' },
-    early:   { text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`, sub: `Approaching ${threat?.zone?.name || 'a dead zone'}` },
-    warning: { 
-      text: `Almost offline — ${Math.round(threat?.etaMinutes || 3)} min left`, 
-      sub: 'Open browser to save what you need' 
-    },
-    early: {
-      text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`,
-      sub: 'Open browser to save content before going offline'
-    },
-    critical:{ text: 'Losing signal now',            sub: 'Last save in progress' },
-    offline: { text: "You're offline",              sub: 'Serving from your reserve' },
+    clear   : { text: "You're online",                                                     sub: 'Reserve filling in background' },
+    early   : { text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`,  sub: 'Open browser to save content before going offline' },
+    warning : { text: `Almost offline — ${Math.round(threat?.etaMinutes || 3)} min left`, sub: 'Open browser to save what you need now' },
+    critical: { text: 'Losing signal now',                                                 sub: 'Open reserve to browse saved content' },
+    offline : { text: "You're offline",                                                    sub: 'Open reserve to browse saved content' },
   };
   const c = cfg[state] || cfg.clear;
 
@@ -189,42 +195,56 @@ function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
               <Text style={s.progPct}>{progress.percent}%</Text>
             </View>
             <View style={s.progBar}>
-              <View style={[s.progFill, { width: progress.percent + '%' as any }]} />
+              <View style={[s.progFill, { width: (progress.percent + '%') as any }]} />
             </View>
             <Text style={s.progCount}>{progress.saved} of {progress.total} items</Text>
           </View>
         )}
 
         <View style={s.divider} />
-        <TouchableOpacity onPress={() => nav('reserve')}>
+
+        <TouchableOpacity onPress={() => nav('reserve')} activeOpacity={0.7} style={s.linkRow}>
           <Text style={s.navLink}>View saved content →</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => nav('browser')}>
+        <TouchableOpacity onPress={() => nav('browser')} activeOpacity={0.7} style={s.linkRow}>
           <Text style={s.navLink}>Browse & save →</Text>
         </TouchableOpacity>
+
         <View style={s.divider} />
 
-        <Text style={s.sectionLabel}>Going offline soon?</Text>
-        <View style={s.triggerList}>
-          {[
-            { label: 'Boarding a flight',    mode: 'flight',   mins: 30 },
-            { label: 'Taking the metro',     mode: 'metro',    mins: 5  },
-            { label: 'Long highway stretch', mode: 'highway',  mins: 15 },
-            { label: 'Going underground',    mode: 'basement', mins: 3  },
-          ].map((t, i) => (
-            <TouchableOpacity key={i} style={s.triggerRow}
-              onPress={() => onTrigger(t.mode, t.mins)}>
-              <Text style={s.triggerName}>{t.label}</Text>
-              <Text style={s.triggerMins}>{t.mins} min</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Hide triggers when offline */}
+        {state !== 'offline' && (
+          <>
+            <Text style={s.sectionLabel}>Going offline soon?</Text>
+            <View style={s.triggerList}>
+              {[
+                { label: 'Boarding a flight',    mode: 'flight',   mins: 30 },
+                { label: 'Taking the metro',     mode: 'metro',    mins: 5  },
+                { label: 'Long highway stretch', mode: 'highway',  mins: 15 },
+                { label: 'Going underground',    mode: 'basement', mins: 3  },
+              ].map((t, i) => (
+                <TouchableOpacity key={i} style={s.triggerRow} activeOpacity={0.7}
+                  onPress={() => onTrigger(t.mode, t.mins)}>
+                  <Text style={s.triggerName}>{t.label}</Text>
+                  <Text style={s.triggerMins}>{t.mins} min</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Show when offline */}
+        {state === 'offline' && (
+          <TouchableOpacity onPress={() => nav('reserve')} activeOpacity={0.7} style={s.offlineBtn}>
+            <Text style={s.offlineBtnText}>Open saved content →</Text>
+          </TouchableOpacity>
+        )}
+
       </ScrollView>
       <BottomNav screen="home" nav={nav} />
     </View>
   );
 }
-
 
 function SettingsScreen({ nav }: any) {
   const [size, setSize] = useState(2048);
@@ -248,7 +268,7 @@ function SettingsScreen({ nav }: any) {
         </View>
         <View style={s.divider} />
         <Text style={s.sectionLabel}>Privacy</Text>
-        {['Data never leaves your device','We never see what you save','Chats and passwords are blocked','Incognito sessions are ignored','Delete everything anytime'].map((p, i) => (
+        {['Data never leaves your device', 'We never see what you save', 'Chats and passwords are blocked', 'Incognito sessions are ignored', 'Delete everything anytime'].map((p, i) => (
           <Text key={i} style={s.privacyItem}>{p}</Text>
         ))}
         <View style={s.divider} />
@@ -263,77 +283,64 @@ function SettingsScreen({ nav }: any) {
   );
 }
 
-
-function BottomNav({ screen, nav }: any) {
-  return (
-    <View style={s.bottomNav}>
-      {['home', 'reserve', 'settings'].map(item => (
-        <TouchableOpacity key={item} style={s.navItem} onPress={() => nav(item)} activeOpacity={0.7} >
-          <View style={[s.navDot, screen === item && s.navDotOn]} />
-          <Text style={[s.navLbl, screen === item && s.navLblOn]}>
-            {item.charAt(0).toUpperCase() + item.slice(1)}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
-  root         : { flex: 1, backgroundColor: '#0D0D0D' },
-  loading      : { flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
-  loadingText  : { color: '#fff', fontSize: 24, fontWeight: '500' },
-  loadingSub   : { color: '#555', fontSize: 13, marginTop: 8 },
-  scroll       : { padding: 24, paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 16 },
-  topbar       : { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 36 },
-  appName      : { color: '#fff', fontSize: 14, fontWeight: '500' },
-  topbarRight  : { color: '#555', fontSize: 13 },
-  signalBlock  : { marginBottom: 24 },
-  signalLabel  : { fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
-  signalText   : { fontSize: 22, fontWeight: '500', color: '#fff', marginBottom: 4, lineHeight: 28 },
-  signalSub    : { fontSize: 13, color: '#555' },
-  divider      : { height: 1, backgroundColor: '#1A1A1A', marginVertical: 20 },
-  infoBox      : { backgroundColor: '#111', borderRadius: 10, padding: 14, marginBottom: 10 },
-  infoLabel    : { fontSize: 11, color: '#555', marginBottom: 6 },
-  infoVal      : { fontSize: 14, color: '#ccc', fontWeight: '500' },
-  infoSub      : { fontSize: 11, color: '#444', marginTop: 3 },
-  progRow      : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progItem     : { fontSize: 12, color: '#555', flex: 1 },
-  progPct      : { fontSize: 12, color: '#888' },
-  progBar      : { height: 2, backgroundColor: '#1A1A1A', borderRadius: 1, overflow: 'hidden', marginBottom: 8 },
-  progFill     : { height: 2, backgroundColor: '#fff', borderRadius: 1 },
-  progCount    : { fontSize: 11, color: '#444' },
-  navLink: { fontSize: 13, color: '#555', marginBottom: 4, paddingVertical: 8 },
-  sectionLabel : { fontSize: 11, color: '#444', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
-  sectionSub   : { fontSize: 12, color: '#444', lineHeight: 18, marginBottom: 14 },
-  triggerList  : { gap: 6 },
-  triggerRow   : { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#111', borderRadius: 9, marginBottom: 6 },
-  triggerName  : { fontSize: 13, color: '#bbb' },
-  triggerMins  : { fontSize: 11, color: '#444' },
-  header       : { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: Platform.OS === 'ios' ? 56 : 36 },
-  backBtn      : { fontSize: 13, color: '#555' },
-  pageTitle    : { fontSize: 14, fontWeight: '500', color: '#fff' },
-  statRow      : { flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 10 },
-  statBox      : { flex: 1, backgroundColor: '#111', borderRadius: 8, padding: 10 },
-  statN        : { fontSize: 16, fontWeight: '500', color: '#fff' },
-  statL        : { fontSize: 10, color: '#444', marginTop: 2 },
-  empty        : { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  emptyTitle   : { color: '#fff', fontSize: 16, fontWeight: '500', marginBottom: 8 },
-  emptySub     : { color: '#444', fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  sizeRow      : { flexDirection: 'row', gap: 6, marginBottom: 4 },
-  sizeBtn      : { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 8, backgroundColor: '#111', borderWidth: 1, borderColor: '#1A1A1A' },
-  sizeBtnOn    : { borderColor: '#555' },
-  sizeBtnText  : { fontSize: 12, color: '#555', fontWeight: '500' },
-  sizeBtnTextOn: { color: '#ccc' },
-  privacyItem  : { fontSize: 12, color: '#555', paddingLeft: 14, marginBottom: 8 },
-  infoRow      : { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#161616' },
-  infoLbl      : { fontSize: 13, color: '#555' as any },
-  infoVal: { fontSize: 13, color: '#888' as any, fontWeight: '500' as '500' },
-  version      : { fontSize: 11, color: '#2A2A2A', textAlign: 'center', marginTop: 8 },
-  bottomNav    : { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#1A1A1A', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 24 : 14, backgroundColor: '#0D0D0D' },
-  navItem      : { flex: 1, alignItems: 'center', gap: 3 },
-  navDot       : { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
-  navDotOn     : { backgroundColor: '#fff' },
-  navLbl       : { fontSize: 10, color: '#444' },
-  navLblOn     : { color: '#fff' },
+  root          : { flex: 1, backgroundColor: '#0D0D0D' },
+  loading       : { flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
+  loadingText   : { color: '#fff', fontSize: 24, fontWeight: '500' },
+  loadingSub    : { color: '#555', fontSize: 13, marginTop: 8 },
+  scroll        : { padding: 24, paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 16 },
+  topbar        : { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 36 },
+  appName       : { color: '#fff', fontSize: 14, fontWeight: '500' },
+  topbarRight   : { color: '#555', fontSize: 13 },
+  signalBlock   : { marginBottom: 24 },
+  signalLabel   : { fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  signalText    : { fontSize: 22, fontWeight: '500', color: '#fff', marginBottom: 4, lineHeight: 28 },
+  signalSub     : { fontSize: 13, color: '#555' },
+  divider       : { height: 1, backgroundColor: '#1A1A1A', marginVertical: 20 },
+  infoBox       : { backgroundColor: '#111', borderRadius: 10, padding: 14, marginBottom: 10 },
+  infoLabel     : { fontSize: 11, color: '#555', marginBottom: 6 },
+  infoVal       : { fontSize: 14, color: '#ccc', fontWeight: '500' },
+  infoSub       : { fontSize: 11, color: '#444', marginTop: 3 },
+  progRow       : { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  progItem      : { fontSize: 12, color: '#555', flex: 1 },
+  progPct       : { fontSize: 12, color: '#888' },
+  progBar       : { height: 2, backgroundColor: '#1A1A1A', borderRadius: 1, overflow: 'hidden', marginBottom: 8 },
+  progFill      : { height: 2, backgroundColor: '#fff', borderRadius: 1 },
+  progCount     : { fontSize: 11, color: '#444' },
+  linkRow       : { paddingVertical: 6 },
+  navLink       : { fontSize: 13, color: '#555' },
+  sectionLabel  : { fontSize: 11, color: '#444', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  sectionSub    : { fontSize: 12, color: '#444', lineHeight: 18, marginBottom: 14 },
+  triggerList   : { gap: 6 },
+  triggerRow    : { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, backgroundColor: '#111', borderRadius: 9, marginBottom: 6 },
+  triggerName   : { fontSize: 14, color: '#bbb' },
+  triggerMins   : { fontSize: 12, color: '#444' },
+  offlineBtn    : { backgroundColor: '#111', borderRadius: 10, padding: 16, alignItems: 'center', marginTop: 8 },
+  offlineBtnText: { color: '#888', fontSize: 14 },
+  header        : { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: Platform.OS === 'ios' ? 56 : 36 },
+  backBtn       : { fontSize: 13, color: '#555' },
+  pageTitle     : { fontSize: 14, fontWeight: '500', color: '#fff' },
+  statRow       : { flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 10 },
+  statBox       : { flex: 1, backgroundColor: '#111', borderRadius: 8, padding: 10 },
+  statN         : { fontSize: 16, fontWeight: '500', color: '#fff' },
+  statL         : { fontSize: 10, color: '#444', marginTop: 2 },
+  empty         : { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
+  emptyTitle    : { color: '#fff', fontSize: 16, fontWeight: '500', marginBottom: 8 },
+  emptySub      : { color: '#444', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  sizeRow       : { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  sizeBtn       : { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 8, backgroundColor: '#111', borderWidth: 1, borderColor: '#1A1A1A' },
+  sizeBtnOn     : { borderColor: '#555' },
+  sizeBtnText   : { fontSize: 12, color: '#555', fontWeight: '500' },
+  sizeBtnTextOn : { color: '#ccc' },
+  privacyItem   : { fontSize: 12, color: '#555', paddingLeft: 14, marginBottom: 8 },
+  infoRow       : { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#161616' },
+  infoLbl       : { fontSize: 13, color: '#555' as any },
+  infoVal       : { fontSize: 13, color: '#888' as any, fontWeight: '500' as '500' },
+  version       : { fontSize: 11, color: '#2A2A2A', textAlign: 'center', marginTop: 8 },
+  bottomNav     : { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#1A1A1A', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 24 : 14, backgroundColor: '#0D0D0D' },
+  navItem       : { flex: 1, alignItems: 'center', gap: 3 },
+  navDot        : { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
+  navDotOn      : { backgroundColor: '#fff' },
+  navLbl        : { fontSize: 10, color: '#444' },
+  navLblOn      : { color: '#fff' },
 });
