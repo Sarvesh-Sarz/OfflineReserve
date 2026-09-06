@@ -1,10 +1,5 @@
 declare const global: any;
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Platform, StatusBar, Alert,
-} from 'react-native';
-
 import SignalMonitor from './src/engine/SignalMonitor';
 import ReserveStorage from './src/storage/ReserveStorage';
 import ReserveScreen from './src/screens/ReserveScreen';
@@ -13,6 +8,10 @@ import BrowserScreen from './src/screens/BrowserScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AutoSaver from './src/engine/AutoSaver';
 import NotificationManager from './src/notification/NotificationManager';
+import {
+  View, Text, StyleSheet, TouchableOpacity,
+  ScrollView, Platform, StatusBar, Alert, AppState,
+} from 'react-native';
 
 type Screen = 'home' | 'reserve' | 'settings' | 'browser';
 
@@ -24,6 +23,25 @@ export default function App() {
   const [ready, setReady]     = useState(true);
 
   useEffect(() => { bootEngines(); }, []);
+    // Check expiry when app comes to foreground
+  useEffect(() => {
+    const checkExpiry = async () => {
+      const expiresRaw = await AsyncStorage.getItem('@trigger_expires');
+      if (expiresRaw && Date.now() > parseInt(expiresRaw)) {
+        setSigState('clear');
+        setThreat(null);
+        await AsyncStorage.removeItem('@trigger_expires');
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        checkExpiry();
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const bootEngines = async () => {
     try {
