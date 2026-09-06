@@ -188,7 +188,7 @@ function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
     const interval = setInterval(checkTrigger, 10000); // check every 10s
     return () => clearInterval(interval);
   }, []);
-  
+
   const cfg: any = {
     clear   : { text: "You're online",                                                     sub: 'Reserve filling in background' },
     early   : { text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`,  sub: 'Open browser to save content before going offline' },
@@ -247,8 +247,19 @@ function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
 
         <View style={s.divider} />
 
-        {/* Hide triggers when offline */}
-        {state !== 'offline' && (
+        {/* Countdown active — show save prompt */}
+        {triggerActive && state !== 'offline' && (
+          <View style={s.infoBox}>
+            <Text style={s.infoLabel}>Countdown active</Text>
+            <Text style={s.infoVal}>Save content before you go offline</Text>
+            <TouchableOpacity onPress={() => nav('browser')} activeOpacity={0.7}>
+              <Text style={{ color: '#555', fontSize: 13, marginTop: 8 }}>Open browser →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Show triggers only when online and no countdown */}
+        {state !== 'offline' && !triggerActive && (
           <>
             <Text style={s.sectionLabel}>Going offline soon?</Text>
             <View style={s.triggerList}>
