@@ -172,6 +172,23 @@ function BottomNav({ screen, nav }: any) {
 }
 
 function HomeScreen({ nav, state, threat, progress, onTrigger }: any) {
+  const [triggerActive, setTriggerActive] = useState(false);
+
+  useEffect(() => {
+    const checkTrigger = async () => {
+      const expiresRaw = await AsyncStorage.getItem('@trigger_expires');
+      if (expiresRaw && Date.now() < parseInt(expiresRaw)) {
+        setTriggerActive(true);
+      } else {
+        setTriggerActive(false);
+      }
+    };
+
+    checkTrigger();
+    const interval = setInterval(checkTrigger, 10000); // check every 10s
+    return () => clearInterval(interval);
+  }, []);
+  
   const cfg: any = {
     clear   : { text: "You're online",                                                     sub: 'Reserve filling in background' },
     early   : { text: `Signal dropping in ~${Math.round(threat?.etaMinutes || 10)} min`,  sub: 'Open browser to save content before going offline' },
